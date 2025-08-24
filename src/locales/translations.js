@@ -49,12 +49,18 @@ export const translations = {
       clearChat: "Xóa Trò Chuyện",
       welcome: {
         title: "Chào Mừng Đến Với Trợ Lý Pháp Lý",
-        message: "Tôi có thể giúp bạn với các câu hỏi pháp lý và cung cấp hướng dẫn. Tôi có thể hỗ trợ gì cho bạn hôm nay?"
+        message: "Tôi có thể giúp bạn với các câu hỏi pháp lý và cung cấp hướng dẫn. Bạn có thể gửi tin nhắn hoặc upload file để tôi phân tích. Tôi có thể hỗ trợ gì cho bạn hôm nay?"
       },
       placeholder: "Nhập câu hỏi pháp lý của bạn...",
       send: "Gửi",
       inputHint: "Nhấn Enter để gửi, Shift + Enter để xuống dòng",
-      errorMessage: "Xin lỗi, đã xảy ra lỗi khi xử lý tin nhắn của bạn. Vui lòng thử lại."
+      errorMessage: "Xin lỗi, đã xảy ra lỗi khi xử lý tin nhắn của bạn. Vui lòng thử lại.",
+      fileUpload: {
+        title: "Gửi file hoặc ảnh",
+        supportedFormats: "Hỗ trợ: ảnh, PDF, Word, text",
+        maxSize: "Kích thước tối đa: 10MB",
+        removeFile: "Xóa file"
+      }
     },
     
     // Language switcher
@@ -114,12 +120,18 @@ export const translations = {
       clearChat: "Clear Chat",
       welcome: {
         title: "Welcome to Legal Assistant",
-        message: "I can help you with legal questions and provide guidance. How can I assist you today?"
+        message: "I can help you with legal questions and provide guidance. You can send messages or upload files for me to analyze. How can I assist you today?"
       },
       placeholder: "Type your legal question...",
       send: "Send",
       inputHint: "Press Enter to send, Shift + Enter for new line",
-      errorMessage: "Sorry, there was an error processing your message. Please try again."
+      errorMessage: "Sorry, there was an error processing your message. Please try again.",
+      fileUpload: {
+        title: "Send file or image",
+        supportedFormats: "Supported: images, PDF, Word, text",
+        maxSize: "Max size: 10MB",
+        removeFile: "Remove file"
+      }
     },
     
     // Language switcher

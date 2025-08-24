@@ -7,7 +7,11 @@ const Chatbot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
   const { t } = useLanguage();
 
   const scrollToBottom = () => {
@@ -18,19 +22,98 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
+  const validateAndSetFile = (file) => {
+    if (!file) return false;
+
+    // Kiểm tra kích thước file (10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert(`File quá lớn. Kích thước tối đa là ${formatFileSize(maxSize)}`);
+      return false;
+    }
+
+    // Kiểm tra loại file được hỗ trợ
+    const supportedTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain'
+    ];
+    
+    if (!supportedTypes.includes(file.type)) {
+      alert('Loại file không được hỗ trợ. Vui lòng chọn file ảnh, PDF, Word hoặc text.');
+      return false;
+    }
+
+    setSelectedFile(file);
+    
+    // Tạo preview cho ảnh
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreview(null);
+    }
+
+    return true;
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    validateAndSetFile(file);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      validateAndSetFile(files[0]);
+    }
+  };
+
+  const removeFile = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+    if ((!inputMessage.trim() && !selectedFile) || isLoading) return;
 
     const userMessage = {
       role: 'user',
-      content: inputMessage.trim(),
+      content: inputMessage.trim() || (selectedFile ? `Đã gửi file: ${selectedFile.name}` : ''),
       timestamp: new Date().toLocaleString('vi-VN', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-      })
+      }),
+      file: selectedFile ? {
+        name: selectedFile.name,
+        type: selectedFile.type,
+        size: selectedFile.size,
+        preview: filePreview
+      } : null
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -50,15 +133,33 @@ const Chatbot = () => {
         content: userMessage.content
       });
 
-      const response = await axios.post('https://8a7663969b97.ngrok-free.app/chat', {
-        message: userMessage.content,
-        conversation_history: conversationHistory
-      });
+      let response;
 
-      // Process AI response to handle asterisks
+      if (selectedFile) {
+        // Gửi file cùng với tin nhắn
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('message', inputMessage.trim() || 'Hãy phân tích file này');
+        formData.append('conversation_history', JSON.stringify(conversationHistory));
+
+        response = await axios.post('https://5c398539668c.ngrok-free.app/chat-with-file', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } else {
+        // Gửi tin nhắn thông thường
+        response = await axios.post('https://5c398539668c.ngrok-free.app/chat', {
+          message: userMessage.content,
+          conversation_history: conversationHistory
+        });
+      }
+
+      // Process AI response to handle asterisks and add bullet points
       const processedContent = response.data.response
         .replace(/\*\*/g, '**') // Keep bold formatting
-        .replace(/\*/g, '') // Remove single asterisks
+        .replace(/^\s*[-*]\s+/gm, '• ') // Convert dashes and asterisks at line start to bullet points
+        .replace(/\*/g, '') // Remove remaining single asterisks
         .trim();
 
       const botMessage = {
@@ -74,6 +175,9 @@ const Chatbot = () => {
       };
 
       setMessages(prev => [...prev, botMessage]);
+      
+      // Xóa file sau khi gửi thành công
+      removeFile();
     } catch (error) {
       console.error('Error sending message:', error);
       
@@ -104,6 +208,15 @@ const Chatbot = () => {
 
   const clearChat = () => {
     setMessages([]);
+    removeFile();
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -131,7 +244,33 @@ const Chatbot = () => {
               className={`message ${message.role === 'user' ? 'user-message' : 'bot-message'}`}
             >
               <div className="message-content">
-                {message.content}
+                {message.content.split('\n').map((line, lineIndex) => (
+                  <div key={lineIndex}>
+                    {line}
+                    {lineIndex < message.content.split('\n').length - 1 && <br />}
+                  </div>
+                ))}
+                
+                {/* Hiển thị file đính kèm */}
+                {message.file && (
+                  <div className="file-attachment">
+                    {message.file.preview ? (
+                      <div className="file-preview">
+                        <img src={message.file.preview} alt={message.file.name} />
+                        <div className="file-info">
+                          <span className="file-name">{message.file.name}</span>
+                          <span className="file-size">{formatFileSize(message.file.size)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="file-info">
+                        <span className="file-icon">📎</span>
+                        <span className="file-name">{message.file.name}</span>
+                        <span className="file-size">{formatFileSize(message.file.size)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="message-timestamp">
                 {message.timestamp}
@@ -154,7 +293,28 @@ const Chatbot = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="chat-input">
+        <div className={`chat-input ${isDragOver ? 'drag-over' : ''}`}
+             onDragOver={handleDragOver}
+             onDragLeave={handleDragLeave}
+             onDrop={handleDrop}>
+          {/* File preview */}
+          {selectedFile && (
+            <div className="file-preview-container">
+              <div className="file-preview-content">
+                {filePreview ? (
+                  <img src={filePreview} alt={selectedFile.name} className="file-preview-image" />
+                ) : (
+                  <div className="file-preview-icon">📎</div>
+                )}
+                <div className="file-preview-info">
+                  <span className="file-name">{selectedFile.name}</span>
+                  <span className="file-size">{formatFileSize(selectedFile.size)}</span>
+                </div>
+                <button onClick={removeFile} className="remove-file-btn">✕</button>
+              </div>
+            </div>
+          )}
+
           <div className="input-container">
             <textarea
               value={inputMessage}
@@ -164,16 +324,36 @@ const Chatbot = () => {
               disabled={isLoading}
               rows="1"
             />
-            <button
-              onClick={sendMessage}
-              disabled={!inputMessage.trim() || isLoading}
-              className="send-button"
-            >
-              {isLoading ? '⏳' : t('chatbot.send')}
-            </button>
+            
+            <div className="input-buttons">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading}
+                className="file-button"
+                title={t('chatbot.fileUpload.title')}
+              >
+                📎
+              </button>
+              <button
+                onClick={sendMessage}
+                disabled={(!inputMessage.trim() && !selectedFile) || isLoading}
+                className="send-button"
+              >
+                {isLoading ? '⏳' : t('chatbot.send')}
+              </button>
+            </div>
           </div>
+          
+          <input
+            ref={fileInputRef}
+            type="file"
+            onChange={handleFileSelect}
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            style={{ display: 'none' }}
+          />
+          
           <div className="input-hint">
-            {t('chatbot.inputHint')}
+            {t('chatbot.inputHint')} • {t('chatbot.fileUpload.supportedFormats')}
           </div>
         </div>
       </div>
