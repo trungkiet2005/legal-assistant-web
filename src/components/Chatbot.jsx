@@ -142,14 +142,14 @@ const Chatbot = () => {
         formData.append('message', inputMessage.trim() || 'Hãy phân tích file này');
         formData.append('conversation_history', JSON.stringify(conversationHistory));
 
-        response = await axios.post('https://5c398539668c.ngrok-free.app/chat-with-file', formData, {
+        response = await axios.post('https://0d5a95559d25.ngrok-free.app/chat-with-file', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
       } else {
         // Gửi tin nhắn thông thường
-        response = await axios.post('https://5c398539668c.ngrok-free.app/chat', {
+        response = await axios.post('https://0d5a95559d25.ngrok-free.app/chat', {
           message: userMessage.content,
           conversation_history: conversationHistory
         });
