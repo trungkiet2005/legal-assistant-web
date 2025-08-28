@@ -13,6 +13,13 @@ const Chatbot = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const { t } = useLanguage();
+  const { currentLanguage } = useLanguage();
+
+  const BASE_URL = 'https://4c88ce69f383.ngrok-free.app';
+
+  // TTS state by message index
+  const [ttsStates, setTtsStates] = useState({});
+  const audioRefs = useRef({});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -142,14 +149,14 @@ const Chatbot = () => {
         formData.append('message', inputMessage.trim() || 'Hãy phân tích file này');
         formData.append('conversation_history', JSON.stringify(conversationHistory));
 
-        response = await axios.post('https://0d5a95559d25.ngrok-free.app/chat-with-file', formData, {
+        response = await axios.post(`${BASE_URL}/chat-with-file`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
       } else {
         // Gửi tin nhắn thông thường
-        response = await axios.post('https://0d5a95559d25.ngrok-free.app/chat', {
+        response = await axios.post(`${BASE_URL}/multiagent`, {
           message: userMessage.content,
           conversation_history: conversationHistory
         });
@@ -198,6 +205,96 @@ const Chatbot = () => {
       setIsLoading(false);
     }
   };
+
+  const handleToggleSpeak = async (index, text) => {
+    try {
+      const existingState = ttsStates[index] || {};
+      const existingAudio = audioRefs.current[index];
+
+      // If we already have audio and it's playing, pause it
+      if (existingAudio && !existingAudio.paused) {
+        existingAudio.pause();
+        existingAudio.currentTime = 0;
+        setTtsStates(prev => ({
+          ...prev,
+          [index]: { ...prev[index], playing: false }
+        }));
+        return;
+      }
+
+      // If audio URL is cached, just play
+      if (existingState.audioUrl && existingAudio) {
+        await existingAudio.play();
+        setTtsStates(prev => ({
+          ...prev,
+          [index]: { ...prev[index], playing: true }
+        }));
+        return;
+      }
+
+      // Otherwise, request TTS generation
+      setTtsStates(prev => ({
+        ...prev,
+        [index]: { ...prev[index], loading: true }
+      }));
+
+      const language = currentLanguage === 'vi' ? 'vi' : 'en';
+      const ttsPayload = {
+        text,
+        voice: 'Kore',
+        language
+      };
+
+      const ttsResponse = await axios.post(`${BASE_URL}/tts`, ttsPayload);
+      const result = ttsResponse.data || {};
+
+      if (!result.audio_file) {
+        throw new Error('No audio_file from TTS');
+      }
+
+      const filename = String(result.audio_file).split('/').pop();
+      const audioResponse = await axios.get(`${BASE_URL}/tts/audio/${filename}`, { responseType: 'blob' });
+      const objectUrl = URL.createObjectURL(audioResponse.data);
+
+      const audio = new Audio(objectUrl);
+      audio.onended = () => {
+        setTtsStates(prev => ({
+          ...prev,
+          [index]: { ...prev[index], playing: false }
+        }));
+      };
+
+      audioRefs.current[index] = audio;
+
+      await audio.play();
+
+      setTtsStates(prev => ({
+        ...prev,
+        [index]: { audioUrl: objectUrl, loading: false, playing: true }
+      }));
+    } catch (e) {
+      console.error('TTS error:', e);
+      setTtsStates(prev => ({
+        ...prev,
+        [index]: { ...prev[index], loading: false, playing: false }
+      }));
+      alert('Không thể phát âm thanh. Vui lòng thử lại.');
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      // Cleanup audio objects and revoke URLs
+      Object.values(audioRefs.current).forEach(audio => {
+        try { audio.pause(); } catch {}
+      });
+      Object.values(ttsStates).forEach(state => {
+        if (state && state.audioUrl) {
+          try { URL.revokeObjectURL(state.audioUrl); } catch {}
+        }
+      });
+    };
+  }, []);
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -269,6 +366,19 @@ const Chatbot = () => {
                         <span className="file-size">{formatFileSize(message.file.size)}</span>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {message.role === 'assistant' && (
+                  <div className="message-actions">
+                    <button
+                      className="audio-button"
+                      onClick={() => handleToggleSpeak(index, message.content)}
+                      title={ttsStates[index]?.playing ? 'Dừng phát' : 'Phát âm thanh'}
+                      disabled={ttsStates[index]?.loading}
+                    >
+                      {ttsStates[index]?.loading ? '⏳' : ttsStates[index]?.playing ? '⏹️ Dừng' : '🔊 Đọc'}
+                    </button>
                   </div>
                 )}
               </div>

@@ -13,17 +13,22 @@ body {
   line-height: 1.6;
   background-color: #F1F1F6;
   color: #0D0D0D;
+  overflow-x: hidden;
 }
 
 .App {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 .main-content {
   flex: 1;
   margin-top: 90px; /* Account for fixed navbar */
+  overflow-x: hidden;
+  width: 100%;
 }
 
 /* Reset some default styles */
