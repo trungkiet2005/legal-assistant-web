@@ -15,7 +15,7 @@ const Chatbot = () => {
   const { t } = useLanguage();
   const { currentLanguage } = useLanguage();
 
-  const BASE_URL = 'https://4c88ce69f383.ngrok-free.app';
+  const BASE_URL = 'https://40ba866a2c9e.ngrok-free.app';
 
   // TTS state by message index
   const [ttsStates, setTtsStates] = useState({});
